@@ -65,6 +65,7 @@ class RssRenderer implements RendererInterface
     {
         $root = $xml->getXml()->createElement('rss');
         $root->setAttribute('version', '2.0');
+        $root->setAttribute('xmlns:atom',"http://www.w3.org/2005/Atom");
         $root = $xml->getXml()->appendChild($root);
 
         $channel = $xml->getXml()->createElement('channel');
@@ -76,10 +77,17 @@ class RssRenderer implements RendererInterface
         $date = new \DateTime();
         $xml->addTextNode('lastBuildDate', $date->format(\DateTime::RSS), $channel);
 
-        $xml->addTextNode('link', $feed->get('link'), $channel);
+        $xml->addTextNode('link', $feed->get('url'), $channel);
         $xml->addTextNode('title', $feed->get('title'), $channel);
         $xml->addTextNode('language', $feed->get('language'), $channel);
 
+        $atomLink = $xml->addTextNode('atom:link', null, $channel);
+        $atomLink->removeChild($atomLink->childNodes->item(0));
+        $atomLink->setAttribute('href', $feed->get('url'));
+        $atomLink->setAttribute('rel', "self");
+        $atomLink->setAttribute('type', "application/rss+xml");
+        
+        
         if (null !== $feed->get('copyright')) {
             $xml->addTextNode('copyright', $feed->get('copyright'), $channel);
         }
@@ -150,8 +158,13 @@ class RssRenderer implements RendererInterface
         $id=$item->getFeedId();
         if(empty($id))
             throw new \InvalidArgumentException('The method « getFeedId » MUST return a not empty value.');
-        $xml->addTextNode('guid', $id, $nodeItem);
+        
+        $guid = $xml->addTextNode('guid', $id, $nodeItem);
 
+        if(strpos($id, 'http://') === false){ //not a url
+        	$guid->setAttribute('isPermaLink', 'false');
+        }
+        
         $xml->addTextNode('link', $this->getRoute($item), $nodeItem);
 
         $xml->addTextNode('pubDate', $item->getFeedDate()->format(\DateTime::RSS), $nodeItem);
@@ -201,11 +214,13 @@ class RssRenderer implements RendererInterface
     {
         $authorData = $item->getFeedAuthor();
         $author = '';
-        if(isset($authorData['name'])) {
-            $author .= $authorData['name'];
-        }
+        
         if (isset($authorData['email'])) {
             $author .= empty($author) ? $authorData['email'] : ' ' . $authorData['email'];
+        }
+        
+        if(isset($authorData['name'])) {
+        	$author .= ' ('.$authorData['name'].')';
         }
 
         if(!empty($author)) {
